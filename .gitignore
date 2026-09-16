@@ -1,1 +1,5 @@
 ﻿models/sign_model.pkl
+.env
+__pycache__/
+venv/
+*.pyc

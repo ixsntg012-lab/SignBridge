@@ -1,13 +1,13 @@
 """
-ASL Communication System — Final
-==================================
+ASL Communication System — Final (V2 with Language Agent)
+==========================================================
 Two-way sign language communication tool.
 
 MODE 1 — SIGN → TEXT  (deaf person signs)
     Hold sign 1 sec  → letter added to sentence
     SPACE            → add space
     BACKSPACE        → delete last char
-    S                → speak sentence
+    S                → refine sentence via Language Agent + speak
     C                → clear
     1-5              → quick phrases
     TAB              → switch to Type Mode
@@ -19,7 +19,7 @@ MODE 2 — TYPE → SIGN  (hearing person types)
     C                → clear
     TAB              → switch to Sign Mode
 
-pip install opencv-python mediapipe scikit-learn joblib numpy pyttsx3
+pip install opencv-python mediapipe scikit-learn joblib numpy pyttsx3 groq python-dotenv
 """
 
 import cv2
@@ -30,6 +30,9 @@ import time, sys, os
 from collections import deque
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
+
+# ── NEW: Language Agent import ──────────────────────────────────────────
+from language_agent import LanguageAgent
 
 # ── TTS ───────────────────────────────────────────────────────────────────
 def speak(text):
@@ -125,6 +128,9 @@ base_opt = python.BaseOptions(model_asset_path=HAND_MODEL)
 detector = vision.HandLandmarker.create_from_options(
     vision.HandLandmarkerOptions(base_options=base_opt, num_hands=1))
 
+# ── NEW: Initialize Language Agent ─────────────────────────────────────
+language_agent = LanguageAgent()
+
 HAND_CONN = [
     (0,1),(1,2),(2,3),(3,4),(0,5),(5,6),(6,7),(7,8),
     (5,9),(9,10),(10,11),(11,12),(9,13),(13,14),(14,15),(15,16),
@@ -164,11 +170,13 @@ def skeleton(frame, hand, w, h):
         cv2.circle(frame,(int(lm.x*w),int(lm.y*h)),4,(220,150,255),-1)
 
 # ── SIGN MODE UI ──────────────────────────────────────────────────────────
-def draw_sign_mode(frame, stable, conf, sentence, hold_prog, sugg):
+def draw_sign_mode(frame, stable, conf, sentence, hold_prog, sugg, refined_display=""):
     W, H = frame.shape[1], frame.shape[0]
 
     # ── Top panel ─────────────────────────────────────────────────────────
-    panel(frame,12,6,W-24,122,10,(20,22,38),0.90)
+    # NEW: grew the top panel a bit taller (122 -> 150) to fit the
+    # refined-text line below the raw sentence line.
+    panel(frame,12,6,W-24,150,10,(20,22,38),0.90)
     txt(frame,"ASL Recognition  —  SIGN → TEXT",
         28,40,sc=0.72,col=(100,180,255),th=2,bold=True)
 
@@ -181,19 +189,29 @@ def draw_sign_mode(frame, stable, conf, sentence, hold_prog, sugg):
     if len(disp) > 52: disp = "..." + disp[-49:]
     txt(frame,f"Sentence:  {disp}",28,78,sc=0.63,col=(225,225,225))
 
+    # ── NEW: Refined sentence (from Language Agent) ────────────────────────
+    # Shown so the deaf/signing person can SEE the correction too —
+    # they can't hear the spoken output.
+    if refined_display:
+        rdisp = refined_display
+        if len(rdisp) > 52: rdisp = "..." + rdisp[-49:]
+        txt(frame,f"Refined:   {rdisp}",28,104,sc=0.60,col=(120,230,160),th=1,bold=True)
+
     # ── Autocomplete suggestions ───────────────────────────────────────────
+    # NEW: moved down from y=108 to y=134 to make room for the Refined line
     if sugg:
         sx = 28
-        txt(frame,"Suggestions:",sx,108,sc=0.38,col=(120,140,185))
+        txt(frame,"Suggestions:",sx,134,sc=0.38,col=(120,140,185))
         sx += 105
         for s in sugg:
             tw,_ = cv2.getTextSize(s,F,0.46,1)[0]
-            panel(frame,sx,95,tw+18,24,5,(35,58,100),0.90)
-            txt(frame,s,sx+9,112,sc=0.46,col=(160,200,255))
+            panel(frame,sx,121,tw+18,24,5,(35,58,100),0.90)
+            txt(frame,s,sx+9,138,sc=0.46,col=(160,200,255))
             sx += tw + 26
 
     # ── Right panel: current letter ────────────────────────────────────────
-    px,py = W-205,135
+    # NEW: moved down from py=135 to py=163 since the top panel grew taller
+    px,py = W-205,163
     panel(frame,px,py,190,215,10,(22,24,40),0.90)
 
     if stable and stable != "?":
@@ -239,7 +257,7 @@ def draw_sign_mode(frame, stable, conf, sentence, hold_prog, sugg):
 
     # ── Hint bar ──────────────────────────────────────────────────────────
     panel(frame,12,H-38,W-24,32,6,(16,18,32),0.88)
-    txt(frame,"SPACE=Space  BACK=Delete  S=Speak  C=Clear  TAB=Type Mode  1-5=Quick Phrase  ESC=Quit",
+    txt(frame,"SPACE=Space  BACK=Delete  S=Speak(refined)  C=Clear  TAB=Type Mode  1-5=Quick Phrase  ESC=Quit",
         22,H-18,sc=0.38,col=(130,148,190))
 
 # ── TYPE MODE UI ──────────────────────────────────────────────────────────
@@ -331,11 +349,13 @@ last_added   = ""
 last_add_t   = 0.0
 hold_prog    = 0.0
 sugg         = []
+refined_display = ""   # NEW: holds the last refined sentence, for on-screen display
 
 print("="*55)
-print("  ASL Communication System")
+print("  ASL Communication System (V2 — Language Agent)")
 print("  TAB = switch modes  |  ESC = quit")
 print("  Sign mode: hold letter 1 sec → added")
+print("  Sign mode: press S → refines sentence via LLM + speaks")
 print("  Type mode: type text → see sign cards")
 print("="*55)
 
@@ -385,6 +405,7 @@ while True:
                         last_add_t  = now
                         hold_start  = None
                         pred_buf.clear()
+                        refined_display = ""   # NEW: sentence changed, old refined text is stale
                         print(f"[+] {stable_pred.upper()} → '{sentence}'")
             else:
                 hold_start = None
@@ -394,7 +415,7 @@ while True:
         # Autocomplete on last partial word
         words = sentence.split(" ")
         sugg  = autocomplete(words[-1], 3) if words[-1] else []
-        draw_sign_mode(frame, stable_pred, conf, sentence, hold_prog, sugg)
+        draw_sign_mode(frame, stable_pred, conf, sentence, hold_prog, sugg, refined_display)
 
     # ── TYPE MODE ─────────────────────────────────────────────────────────
     else:
@@ -416,17 +437,30 @@ while True:
         pred_buf.clear(); hold_start=None
         print(f"[Mode] → {mode}")
 
-    # S → speak
+    # S → speak (NOW WITH LANGUAGE AGENT REFINEMENT for SIGN mode)
     elif key == ord('s'):
         t = sentence if mode=="SIGN" else typed_text
         if t.strip():
-            print(f"[Speaking] {t}")
-            speak(t)
+            if mode == "SIGN":
+                # ── NEW: refine raw sign-detected text into a natural
+                # sentence before speaking, using the Language Agent (LLM)
+                refined = language_agent.refine(t)
+                refined_display = refined   # NEW: show it on screen too —
+                                             # the deaf person can't hear
+                                             # the spoken output, so they
+                                             # need to SEE the correction
+                print(f"[Raw]     {t}")
+                print(f"[Refined] {refined}")
+                speak(refined)
+            else:
+                print(f"[Speaking] {t}")
+                speak(t)
 
     # C → clear
     elif key == ord('c'):
         if mode=="SIGN":
             sentence=""; last_added=""; pred_buf.clear(); sugg=[]
+            refined_display = ""   # NEW: clear the old refined text too
         else:
             typed_text=""
 
@@ -436,9 +470,11 @@ while True:
             sentence += " "; last_added=""
         elif key == 8 and sentence:             # BACKSPACE
             sentence = sentence[:-1]
+            refined_display = ""   # NEW: raw sentence changed, old refined text is stale
         elif chr(key) in QUICK_PHRASES:         # 1-5 quick phrases
             phrase    = QUICK_PHRASES[chr(key)]
             sentence  = phrase
+            refined_display = ""   # NEW: new phrase started, clear stale refined text
             print(f"[Quick] {phrase}")
             speak(phrase)
 

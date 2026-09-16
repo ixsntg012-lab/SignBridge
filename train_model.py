@@ -46,7 +46,13 @@ print(f"Classes: {sorted(df['label'].unique())}")
 print(f"Samples per class:\n{df['label'].value_counts().sort_index().to_string()}\n")
 
 X_raw = df.drop("label", axis=1).values
-y     = df["label"].values
+
+# FIX: explicitly convert to a plain numpy array of strings.
+# Newer pandas versions can back string columns with a PyArrow-backed
+# dtype, which sklearn's indexing utilities don't handle correctly
+# (causes "only integer scalar arrays can be converted to a scalar
+# index" during train_test_split). Forcing a plain numpy array avoids this.
+y = df["label"].astype(str).to_numpy()
 
 # ── Feature extraction ─────────────────────────────────────────────────────
 def extract(rows):
