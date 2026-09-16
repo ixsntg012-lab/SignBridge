@@ -1,70 +1,27 @@
-# SignBridge — ASL Fingerspelling Communication System
+# SignBridge 🤟
 
-A real-time two-way communication tool that bridges the gap between the **Deaf community and hearing individuals** using American Sign Language (ASL) fingerspelling.
+<div align="center">
 
-Built with Python, MediaPipe, and Machine Learning — runs entirely on a standard webcam, no special hardware required.
+**Real-time two-way ASL Fingerspelling Communication System**
 
-![Demo](screenshot.png)
+*Bridging the gap between Deaf and hearing individuals — no special hardware required*
 
----
+![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![MediaPipe](https://img.shields.io/badge/MediaPipe-Hand_Tracking-0097A7?style=for-the-badge)
+![Scikit-learn](https://img.shields.io/badge/Scikit--learn-ML-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white)
+![OpenCV](https://img.shields.io/badge/OpenCV-Computer_Vision-5C3EE8?style=for-the-badge&logo=opencv)
+![Accuracy](https://img.shields.io/badge/Accuracy-98.96%25-brightgreen?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
 
-## Who Is This For?
-
-This system is designed primarily as a **bridge tool for hearing individuals** who do not know sign language but need to communicate with Deaf or Hard-of-Hearing people.
-
-| User | Mode | What They Do |
-|---|---|---|
-| Hearing person (doesn't know ASL) | **Type → Sign** | Types text → ASL hand sign cards appear on screen → Deaf person reads the signs |
-| Hearing person learning ASL | **Sign → Text** | Practices signs → system recognizes and shows the letter → verifies correctness |
-| Educator / Parent | **Both modes** | Uses as a learning and communication aid |
-
-> **Honest note:** Deaf individuals who are fluent in ASL do not need this system to understand their own signs — they already know them. The value of this tool is for the hearing side of the conversation, and for learners building their fingerspelling skills.
+</div>
 
 ---
 
-## Features
+## What is SignBridge?
 
-| Feature | Description |
-|---|---|
-| Two-way communication | Sign→Text mode and Type→Sign mode in one app |
-| Real-time recognition | 30fps hand landmark detection via MediaPipe |
-| A–Y alphabet support | 24 static ASL letters (J and Z are motion-based) |
-| Sign card display | Type any text → see the corresponding ASL hand sign for each letter |
-| Autocomplete | Suggests words as you sign — speeds up sentence building |
-| Quick phrases | Press 1–5 for common phrases (Hello, Thank you, I need help…) |
-| Smoothed predictions | 10-frame majority-vote buffer eliminates flickering |
-| Duplicate suppression | Hold-timer logic prevents unintended repeated letters |
-| Text-to-speech | Speaks the sentence aloud — cross-platform |
-| Data augmentation | 10x dataset expansion via noise, flip, scale, rotation |
-| Model evaluation | Per-class accuracy report + confusion matrix |
+SignBridge is a real-time, two-way ASL fingerspelling communication tool designed to help **hearing individuals communicate with Deaf or Hard-of-Hearing people** — without knowing sign language.
 
----
-
-## How It Works
-
-```
-Webcam
-  │
-  ▼
-MediaPipe Hand Landmarker
-(21 hand keypoints × 3D coordinates)
-  │
-  ▼
-Feature Engineering
-(Wrist-relative normalization + scale normalization)
-  │
-  ▼
-Soft Voting Ensemble (Random Forest × 2)
-  │
-  ▼
-10-frame Majority Vote Buffer
-  │
-  ▼
-Hold Timer + Duplicate Suppression
-  │
-  ▼
-Sentence Builder → Text-to-Speech
-```
+It runs entirely on a standard webcam. No special hardware. No internet required.
 
 ---
 
@@ -72,94 +29,122 @@ Sentence Builder → Text-to-Speech
 
 ### Mode 1 — SIGN → TEXT
 Deaf person or ASL learner signs into the webcam.
-System recognizes the letter, builds words, speaks the sentence.
+System recognizes each letter, builds words, and speaks the sentence aloud.
 
 ```
-Hold any ASL sign for 1 second → letter added to sentence
+Hold any ASL sign for 1 second → letter confirmed → sentence built → spoken aloud
 ```
 
 ### Mode 2 — TYPE → SIGN
 Hearing person types normally.
-The corresponding ASL hand sign card appears for each letter.
-Deaf person reads the signs on screen.
+The corresponding ASL hand sign card appears on screen for the Deaf person to read.
 
 ```
-Type "hello" → H, E, L, L, O sign cards appear side by side
+Type "hello" → H E L L O sign cards appear side by side on screen
 ```
 
 Switch between modes with **TAB**.
 
 ---
 
-## Dataset
+## Results
 
-- **Collected by:** Manually using `collect_data.py`
-- **Size:** ~150–200 samples per letter × 24 letters ≈ 3,600+ samples
-- **After augmentation:** ~36,000+ samples (10x expansion)
-- **Features:** 21 landmarks × 3 coordinates (x, y, z) = 63 features per frame
-- **Normalization:** Wrist-relative translation + max-distance scale normalization
-
-### Augmentation techniques applied:
-| Technique | Purpose |
-|---|---|
-| Gaussian noise (×3) | Simulates natural hand tremor |
-| Horizontal flip | Adds left-hand variants |
-| Scale variation (×2) | Handles different distances from camera |
-| 2D rotation (×2) | Handles wrist tilt variation |
-| Combined (noise + scale) | Edge case coverage |
+| Metric | Value |
+|--------|-------|
+| **Test Accuracy** | **98.96%** |
+| Validation | 5-fold Stratified Cross-Validation |
+| Dataset (raw) | ~3,600 samples (150–200 per letter × 24 letters) |
+| Dataset (augmented) | ~36,000 samples (10x expansion) |
+| Model | Soft Voting Ensemble — Random Forest × 2 |
+| Input features | 63 (21 landmarks × x, y, z) |
+| Frame rate | 30fps real-time |
+| Letters supported | 24 (A–Y; J and Z require motion — future work) |
 
 ---
 
-## Model
+## How It Works
 
-**Soft Voting Ensemble — Random Forest × 2**
-- Two Random Forest classifiers with different hyperparameters
-- Probabilities averaged → smoother, more calibrated confidence scores
-- Evaluated with 5-fold stratified cross-validation
-
-See `models/eval_report.txt` and `models/confusion_matrix.png` after running `train_model.py`.
+```
+Webcam Frame (30fps)
+        │
+        ▼
+MediaPipe Hand Landmarker
+(21 hand keypoints — 3D coordinates)
+        │
+        ▼
+Feature Engineering
+(Wrist-relative + scale normalization → 63 features)
+        │
+        ▼
+Soft Voting Ensemble (Random Forest × 2)
+        │
+        ▼
+10-frame Majority Vote Buffer
+(Eliminates flickering from natural hand tremor)
+        │
+        ▼
+Hold Timer + Duplicate Suppression
+        │
+        ▼
+Sentence Builder → Autocomplete → Text-to-Speech
+```
 
 ---
 
 ## Tech Stack
 
 | Component | Technology |
-|---|---|
+|-----------|-----------|
 | Hand Tracking | MediaPipe Hand Landmarker |
-| ML Model | Scikit-learn (Random Forest Ensemble) |
-| Feature Engineering | Wrist-relative 3D normalization |
-| Data Augmentation | NumPy geometric transforms |
+| ML Model | Scikit-learn — Soft Voting Random Forest Ensemble |
+| Feature Engineering | Wrist-relative 3D normalization + scale normalization |
+| Data Augmentation | NumPy geometric transforms (6 techniques) |
 | Computer Vision | OpenCV |
-| Speech Output | pyttsx3 (cross-platform) |
+| Speech Output | pyttsx3 (cross-platform TTS) |
+
+---
+
+## Dataset & Augmentation
+
+**Self-collected** using a custom webcam collection tool (`collect_data.py`).
+
+| Augmentation Technique | Purpose |
+|------------------------|---------|
+| Gaussian noise (×3) | Simulates natural hand tremor |
+| Horizontal flip | Adds left-hand variants |
+| Scale variation (×2) | Handles different distances from camera |
+| 2D rotation (×2) | Handles wrist tilt variation |
+| Noise + scale combined | Edge case coverage |
+
+**Result:** 3,600 raw samples → 36,000 augmented samples (10x expansion)
 
 ---
 
 ## Installation
 
 ```bash
-git clone https://github.com/ixsntg012-lab/Sign-language-recognition.git
-cd Sign-language-recognition
+git clone https://github.com/ixsntg012-lab/SignBridge.git
+cd SignBridge
 pip install -r requirements.txt
 ```
 
 Download `hand_landmarker.task` from [MediaPipe Models](https://developers.google.com/mediapipe/solutions/vision/hand_landmarker) and place it in the `models/` folder.
 
-> **Note:** `sign_model.pkl` is not included in the repo (large file).
-> Run `python train_model.py` to generate it after collecting data.
+> **Note:** `sign_model.pkl` is not included (large file). Run `python train_model.py` to generate it after collecting data.
 
 ---
 
 ## Usage
 
 ```bash
-# Step 1 — Collect data (only if retraining)
+# Step 1 — Collect data
 python collect_data.py
 
 # Step 2 — Clean dataset
 python fix_dataset.py
 
 # Step 3 — Augment dataset
-python augment_data.py
+python argument_data.py
 
 # Step 4 — Train model
 python train_model.py
@@ -173,17 +158,13 @@ python word_system.py
 ## Controls
 
 | Key | Action |
-|---|---|
+|-----|--------|
 | `TAB` | Switch between Sign mode and Type mode |
 | `SPACE` | Add space between words |
 | `BACKSPACE` | Delete last character |
 | `S` | Speak current sentence aloud |
 | `C` | Clear sentence |
-| `1` | Quick phrase: "Hello, how are you?" |
-| `2` | Quick phrase: "Thank you" |
-| `3` | Quick phrase: "I need help" |
-| `4` | Quick phrase: "Please wait" |
-| `5` | Quick phrase: "Nice to meet you" |
+| `1–5` | Quick phrases (Hello / Thank you / I need help / Please wait / Nice to meet you) |
 | `ESC` | Quit |
 
 ---
@@ -205,12 +186,11 @@ SignBridge/
 │
 ├── collect_data.py              ← webcam data collection tool
 ├── fix_dataset.py               ← dataset cleaning
-├── augment_data.py              ← data augmentation pipeline
+├── argument_data.py             ← data augmentation pipeline
 ├── train_model.py               ← model training + evaluation
 ├── word_system.py               ← main application
 │
 ├── requirements.txt
-├── screenshot.png
 └── README.md
 ```
 
@@ -220,9 +200,9 @@ SignBridge/
 
 - **J and Z** require motion/trajectory tracking — not currently supported.
   Future plan: LSTM-based sequence model for dynamic signs.
-- Recognition accuracy may vary with lighting conditions and hand size diversity in training data.
-- Expanding dataset to 500+ samples per letter would improve generalization across users.
-- Potential extension: full word-level sign language recognition using sequence models.
+- Accuracy may vary with extreme lighting conditions or hand size diversity.
+- Expanding to 500+ samples per letter and more diverse users would improve generalization.
+- Web version using TensorFlow.js — run entirely in browser without installation.
 
 ---
 
